@@ -23,16 +23,18 @@ end
 
 
 to define-landscape
-  resize-world -20 20 -5 5 ;;add here stuff to generate the correct landscape size
-  set K 100
-  set runtime 100
+  set-patch-size 5
+  resize-world -100 100 -5 5 ;;generate the correct landscape size
+  set K 20
+  set runtime 300
   ask patches [set pcolor black]
 end
 
 to setup-patches
   ask patches [
     set carrying_capacity K
-    set pcolor scale-color green carrying_capacity 0 carrying_capacity
+    set pcolor scale-color green carrying_capacity 0 carrying_capacity + 1
+
     ]
 end
 
@@ -45,8 +47,8 @@ to setup-turtles
     set has-mated 0
     set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
     set birth-patch patch-here
-    set fecundity 1.1
-    set disp 0.3
+    set fecundity 1.05
+    set disp 0.5
   ]
 
 end
@@ -70,10 +72,11 @@ end
 to check_population_size
 set population_size count turtles-here
   set pcolor scale-color green population_size 0 carrying_capacity
+  ;if ((count (turtles-on self) with [neutral_allele = 0]) > (count (turtles-on self) with [neutral_allele = 1])) [set pcolor pcolor - 40] ;; quick and very dirty to see which of 2 neutral alleles dominate
 end
 
 to update_allelic_frequency
-  set allelic_freq (count turtles with [neutral_allele = 0]);;/(count turtles-here)
+  set allelic_freq (count (turtles-on self) with [neutral_allele = 0]);;/(count turtles-here)
 end
 
 to reset-food
@@ -88,11 +91,12 @@ end
 
 to move-turtles
   set available-moves [1 -1] ;;;to check
-
+;;; if animal is at landscape border can only disperse in one direction (but keep same total disp proba)
+  if xcor = max-pxcor [set available-moves [-1]]
+  if xcor = min-pxcor [set available-moves [1]]
   if (random 1000) < (disp * 1000)
   [set xcor xcor + one-of available-moves]
 end
-
 
 
 to reproduce  ; clonal reproduction to start, no mutation yet
@@ -100,12 +104,12 @@ if has-mated = 0 [
     let mom self
       hatch random-poisson fecundity [;; the clutch laid by the focal animal
       hide-turtle
-        set neutral_allele [neutral_allele] of mom
-        set adult 0
-          set fecundity 1.1
-          set disp 0.3
-        set has-mated 0
-        set birth-patch patch-here
+      set adult 0
+      set has-mated 0
+      set neutral_allele [neutral_allele] of mom
+      set birth-patch patch-here
+      set fecundity 1.05
+      set disp 0.5
       ]
 
       set has-mated 1
@@ -120,11 +124,11 @@ end
 GRAPHICS-WINDOW
 210
 10
-833
-184
+1223
+74
 -1
 -1
-15.0
+5.0
 1
 10
 1
@@ -134,8 +138,8 @@ GRAPHICS-WINDOW
 1
 1
 1
--20
-20
+-100
+100
 -5
 5
 1
@@ -201,6 +205,10 @@ PENS
 
 (a general understanding of what the model is trying to show or explain)
 
+A range expansion model.
+From a central initial population, individuals reproduce, compete and disperse and as a result the species colonizes the landscape
+At the moment, no evolution and no context-dependency
+
 ## HOW IT WORKS
 
 (what rules the agents use to create the overall behavior of the model)
@@ -232,6 +240,8 @@ PENS
 ## CREDITS AND REFERENCES
 
 (a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+
+Maxime Dahirel, from an initial Matlab model by Marjorie Haond
 @#$#@#$#@
 default
 true
