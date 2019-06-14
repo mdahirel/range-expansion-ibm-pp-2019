@@ -3,8 +3,10 @@
 ;;initial NetLogo version: June 2019
 ;;authors : Maxime Dahirel / Marjorie Haond (initial MatLab model)
 
-globals[K runtime]
-turtles-own [disp fecundity neutral_allele adult birth-patch has-mated available-moves]
+;; extensions [ r ] will need to install the connection between the two for this to work
+
+globals[runtime]
+turtles-own [disp disp-max disp-h disp-lambda fecundity neutral_allele adult birth-patch has-mated available-moves allee-thres]
 patches-own [carrying_capacity population_size allelic_freq food]
 
 
@@ -25,7 +27,6 @@ end
 to define-landscape
   set-patch-size 5
   resize-world -100 100 -10 10 ;;generate the correct landscape size
-  set K 20
   set runtime 300
   ask patches [set pcolor black]
 end
@@ -47,8 +48,11 @@ to setup-turtles
     set has-mated 0
     set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
     set birth-patch patch-here
-    set fecundity 1.5
-    set disp 0.5
+    set fecundity 1.1
+    set disp-max 0.5
+    set disp-h 25
+    set disp-lambda 4
+    set allee-thres start_allee_thres
   ]
 
 end
@@ -62,8 +66,8 @@ to go
   ask patches[reset-food]
 
   ;;competition step  (can be interpreted as either parents competing for egg sites, or larvae competiting against each other _ I think)
-  if Competition_type = "strict K" [ ask turtles[competition_strict_K] ]
-  if Competition_type = "beverton-holt like" [ ask turtles[competition_beverton_holt] ]
+  if competition_type = "strict K" [ ask turtles[competition_strict_K] ]
+  if competition_type = "beverton-holt like" [ ask turtles[competition_beverton_holt] ]
 
   ;;dispersal step
   ask turtles[move-turtles]
@@ -100,6 +104,7 @@ end
 to competition_beverton_holt
   if (random 1000) > (1000 * 1 / (1 + ( (2 - 1) / carrying_capacity ) * population_size)) [die]
   ;;beverton like, check it is actually; (see bonte a de la pena 2009 for source) lambda = 2 for the moment, check what it implies (strength of competition, must be >1)
+  ;; note: needs higher fecundity than classical to work;; find out
 set adult 1
 end
 
@@ -108,6 +113,10 @@ to move-turtles
 ;;; if animal is at landscape border can only disperse in one direction (but keep same total disp proba)
   if xcor = max-pxcor [set available-moves [-1]]
   if xcor = min-pxcor [set available-moves [1]]
+
+  ;if density_dependent_dispersal = "Off" [set disp disp-max]
+  ifelse density_dependent_dispersal [set disp (disp-max * (population_size ^ disp-lambda)/(disp-h ^ disp-lambda + population_size ^ disp-lambda) )] ;; hill function of maximal dispersal rate; how to include negative DDD???
+                                      [set disp disp-max]
   if (random 1000) < (disp * 1000)
   [set xcor xcor + one-of available-moves]
 end
@@ -116,14 +125,19 @@ end
 to reproduce  ; clonal reproduction to start, no mutation yet
 if has-mated = 0 [
     let mom self
+    if ( allee_effects_repro = "yes-marjorie" and population_size <= allee-thres ) [set fecundity (population_size / allee-thres)]
+    if allee_effects_repro = "yes-erm-phillips" [set fecundity (exp( fecundity * (1 - population_size / K ) * ( (population_size - allee-thres) / K ) ))]
       hatch random-poisson fecundity [;; the clutch laid by the focal animal
       hide-turtle
       set adult 0
       set has-mated 0
       set neutral_allele [neutral_allele] of mom
       set birth-patch patch-here
-      set fecundity 1.5
-      set disp 0.5
+      set fecundity [fecundity] of mom
+      set disp-max [disp-max] of mom
+      set disp-h [disp-h] of mom
+      set disp-lambda [disp-lambda] of mom
+      set allee-thres [allee-thres] of mom
       ]
 
       set has-mated 1
@@ -199,7 +213,7 @@ NIL
 PLOT
 448
 263
-648
+772
 413
 count turtles
 NIL
@@ -219,10 +233,79 @@ CHOOSER
 173
 171
 218
-Competition_type
-Competition_type
+competition_type
+competition_type
 "strict K" "beverton-holt like"
 0
+
+CHOOSER
+24
+251
+172
+296
+allee_effects_repro
+allee_effects_repro
+"no" "yes-marjorie" "yes-erm-phillips"
+2
+
+SLIDER
+199
+250
+371
+283
+start_allee_thres
+start_allee_thres
+0
+10
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+SWITCH
+23
+323
+241
+356
+density_dependent_dispersal
+density_dependent_dispersal
+1
+1
+-1000
+
+SLIDER
+246
+186
+418
+219
+K
+K
+10
+500
+20.0
+10
+1
+NIL
+HORIZONTAL
+
+PLOT
+449
+426
+772
+576
+expansion
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "let front_position max [abs xcor] of turtles\nplot front_position"
 
 @#$#@#$#@
 ## WHAT IS IT?
