@@ -24,7 +24,7 @@ end
 
 to define-landscape
   set-patch-size 5
-  resize-world -100 100 -5 5 ;;generate the correct landscape size
+  resize-world -100 100 -10 10 ;;generate the correct landscape size
   set K 20
   set runtime 300
   ask patches [set pcolor black]
@@ -47,7 +47,7 @@ to setup-turtles
     set has-mated 0
     set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
     set birth-patch patch-here
-    set fecundity 1.05
+    set fecundity 1.5
     set disp 0.5
   ]
 
@@ -61,9 +61,17 @@ to go
   ask patches[update_allelic_frequency]
   ask patches[reset-food]
 
-  ask turtles[competition_before]
+  ;;competition step  (can be interpreted as either parents competing for egg sites, or larvae competiting against each other _ I think)
+  if Competition_type = "strict K" [ ask turtles[competition_strict_K] ]
+  if Competition_type = "beverton-holt like" [ ask turtles[competition_beverton_holt] ]
+
+  ;;dispersal step
   ask turtles[move-turtles]
+
+  ;; reproduction step
   ask turtles[reproduce]
+
+  ;; enforce non-overlapping generations: kill all adults
   ask turtles[check-death]
   tick
   ]
@@ -83,9 +91,15 @@ to reset-food
 set food carrying_capacity
 end
 
-to competition_before
+to competition_strict_K  ;;to use if it is impossible to a have a population > carrying capacity, even transiently (parasitoids with hyper-p)
 if food < 1 [ die ]
   ask patch-here [set food (food - 1)]
+set adult 1
+end
+
+to competition_beverton_holt
+  if (random 1000) > (1000 * 1 / (1 + ( (2 - 1) / carrying_capacity ) * population_size)) [die]
+  ;;beverton like, check it is actually; (see bonte a de la pena 2009 for source) lambda = 2 for the moment, check what it implies (strength of competition, must be >1)
 set adult 1
 end
 
@@ -108,7 +122,7 @@ if has-mated = 0 [
       set has-mated 0
       set neutral_allele [neutral_allele] of mom
       set birth-patch patch-here
-      set fecundity 1.05
+      set fecundity 1.5
       set disp 0.5
       ]
 
@@ -125,7 +139,7 @@ GRAPHICS-WINDOW
 210
 10
 1223
-74
+124
 -1
 -1
 5.0
@@ -140,8 +154,8 @@ GRAPHICS-WINDOW
 1
 -100
 100
--5
-5
+-10
+10
 1
 1
 1
@@ -199,6 +213,16 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles"
+
+CHOOSER
+25
+173
+171
+218
+Competition_type
+Competition_type
+"strict K" "beverton-holt like"
+0
 
 @#$#@#$#@
 ## WHAT IS IT?
