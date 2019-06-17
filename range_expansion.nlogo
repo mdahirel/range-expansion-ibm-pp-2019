@@ -6,8 +6,8 @@
 ;; extensions [ r ] will need to install the connection between the two for this to work
 
 globals[runtime]
-turtles-own [disp disp-max disp-h disp-lambda fecundity neutral_allele adult birth-patch has-mated available-moves allee-thres]
-patches-own [carrying_capacity population_size allelic_freq food]
+turtles-own [disp disp-max disp-h disp-lambda fecundity neutral_allele adult has-mated available-moves allee-thres]  ;birth-patch
+patches-own [carrying_capacity population_size food gen-diversity mean-disp-max]
 
 
 to setup
@@ -26,7 +26,7 @@ end
 
 to define-landscape
   set-patch-size 5
-  resize-world -100 100 -10 10 ;;generate the correct landscape size
+  resize-world -100 100 -3 3 ;;generate the correct landscape size
   set runtime 300
   ask patches [set pcolor black]
 end
@@ -47,13 +47,19 @@ to setup-turtles
     set adult 1
     set has-mated 0
     set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
-    set birth-patch patch-here
+    ;set birth-patch patch-here
     set fecundity 1.1
-    set disp-max 0.5
+    ifelse (pycor > 0)
+    [set disp-max 0.5]
+    [set disp-max random-normal 0.5 0.25]
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.1 ]
     set disp-h 25
     set disp-lambda 4
     set allee-thres start_allee_thres
   ]
+
+  ask patches [check_population_size]
+
 
 end
 
@@ -83,21 +89,31 @@ end
 
 to check_population_size
 set population_size count turtles-here
-  set pcolor scale-color green population_size 0 carrying_capacity
+  ifelse population_size > 0
+  [set mean-disp-max mean ([disp-max] of (turtles-on self)) ]
+  [set mean-disp-max -50 ]
+  set pcolor scale-color (80 - 40 * mean-disp-max ) population_size 0 (1.3 * carrying_capacity)
   ;if ((count (turtles-on self) with [neutral_allele = 0]) > (count (turtles-on self) with [neutral_allele = 1])) [set pcolor pcolor - 40] ;; quick and very dirty to see which of 2 neutral alleles dominate
 end
 
 to update_allelic_frequency
-  set allelic_freq (count (turtles-on self) with [neutral_allele = 0]);;/(count turtles-here)
+  ifelse population_size > 5
+  [
+    ifelse (count (turtles-on self) with [neutral_allele = 0]) > (count (turtles-on self) with [neutral_allele = 1])
+
+    [set gen-diversity (count (turtles-on self) with [neutral_allele = 1]) / (count (turtles-on self) with [neutral_allele = 0]) ]
+    [set gen-diversity (count (turtles-on self) with [neutral_allele = 0]) / (count (turtles-on self) with [neutral_allele = 1]) ]
+  ]
+  [set gen-diversity -50 ]
 end
 
 to reset-food
 set food carrying_capacity
 end
 
-to competition_strict_K  ;;to use if it is impossible to a have a population > carrying capacity, even transiently (parasitoids with hyper-p)
+to competition_strict_K  ;;to use if it is impossible to a have a population > carrying capacity, even transiently (parasitoids with no hyper-p)
 if food < 1 [ die ]
-  ask patch-here [set food (food - 1)]
+ask patch-here [set food (food - 1)]
 set adult 1
 end
 
@@ -132,7 +148,7 @@ if has-mated = 0 [
       set adult 0
       set has-mated 0
       set neutral_allele [neutral_allele] of mom
-      set birth-patch patch-here
+      ;set birth-patch patch-here
       set fecundity [fecundity] of mom
       set disp-max [disp-max] of mom
       set disp-h [disp-h] of mom
@@ -153,7 +169,7 @@ GRAPHICS-WINDOW
 210
 10
 1223
-124
+74
 -1
 -1
 5.0
@@ -168,8 +184,8 @@ GRAPHICS-WINDOW
 1
 -100
 100
--10
-10
+-5
+5
 1
 1
 1
@@ -246,7 +262,7 @@ CHOOSER
 allee_effects_repro
 allee_effects_repro
 "no" "yes-marjorie" "yes-erm-phillips"
-2
+0
 
 SLIDER
 199
@@ -270,20 +286,20 @@ SWITCH
 356
 density_dependent_dispersal
 density_dependent_dispersal
-1
+0
 1
 -1000
 
 SLIDER
-246
-186
-418
-219
+4
+387
+176
+420
 K
 K
 10
 500
-20.0
+150.0
 10
 1
 NIL
