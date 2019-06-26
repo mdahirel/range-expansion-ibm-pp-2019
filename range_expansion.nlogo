@@ -26,7 +26,7 @@ end
 
 to define-landscape
   set-patch-size 5
-  resize-world -100 100 -3 3 ;;generate the correct landscape size
+  resize-world -100 100 -9 10 ;;generate the correct landscape size
   set runtime 300
   ask patches [set pcolor black]
 end
@@ -49,10 +49,10 @@ to setup-turtles
     set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
     ;set birth-patch patch-here
     set fecundity 1.1
-    ifelse (pycor > 0)
-    [set disp-max 0.5]
-    [set disp-max random-normal 0.5 0.25]
-    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.1 ]
+
+    set disp-max random-normal 0.1 0.5 ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
+    ;; if we don't do that and set artificially fixed d for non-evo; we have evo+stocha versus non evo and non stocha, instead of evo/non evo being the only difference
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.1 0.5 ]
     set disp-h 25
     set disp-lambda 4
     set allee-thres start_allee_thres
@@ -74,6 +74,8 @@ to go
   ;;competition step  (can be interpreted as either parents competing for egg sites, or larvae competiting against each other _ I think)
   if competition_type = "strict K" [ ask turtles[competition_strict_K] ]
   if competition_type = "beverton-holt like" [ ask turtles[competition_beverton_holt] ]
+
+  ask patches[check_population_size] ;; need a second population size check to update population size for density-dependent dispersal
 
   ;;dispersal step
   ask turtles[move-turtles]
@@ -118,9 +120,8 @@ set adult 1
 end
 
 to competition_beverton_holt
-  if (random 1000) > (1000 * 1 / (1 + ( (2 - 1) / carrying_capacity ) * population_size)) [die]
-  ;;beverton like, check it is actually; (see bonte a de la pena 2009 for source) lambda = 2 for the moment, check what it implies (strength of competition, must be >1)
-  ;; note: needs higher fecundity than classical to work;; find out
+  if (random 1000) > (1000 * 1 / (1 + (population_size * (fecundity - 1) / (carrying_capacity * fecundity) ) )) [die]
+  ;;beverton like ; from poethke 2016 ; to check
 set adult 1
 end
 
@@ -143,14 +144,20 @@ if has-mated = 0 [
     let mom self
     if ( allee_effects_repro = "yes-marjorie" and population_size <= allee-thres ) [set fecundity (population_size / allee-thres)]
     if allee_effects_repro = "yes-erm-phillips" [set fecundity (exp( fecundity * (1 - population_size / K ) * ( (population_size - allee-thres) / K ) ))]
-      hatch random-poisson fecundity [;; the clutch laid by the focal animal
+    ;; look also at altwegg 2013 for another allee formulation
+          hatch random-poisson fecundity [;; the clutch laid by the focal animal
       hide-turtle
       set adult 0
       set has-mated 0
       set neutral_allele [neutral_allele] of mom
       ;set birth-patch patch-here
       set fecundity [fecundity] of mom
-      set disp-max [disp-max] of mom
+
+      ifelse (pycor > 0)
+    [set disp-max random-normal 0.1 0.5];[set disp-max 0.5] ;;if non-evo we redraw from initial distri (think about setting global vars for that)
+    [set disp-max [disp-max] of mom] ;; if evo we inherit
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.1 0.5 ]
+      ;;set disp-max [disp-max] of mom
       set disp-h [disp-h] of mom
       set disp-lambda [disp-lambda] of mom
       set allee-thres [allee-thres] of mom
@@ -169,7 +176,7 @@ GRAPHICS-WINDOW
 210
 10
 1223
-74
+119
 -1
 -1
 5.0
@@ -184,8 +191,8 @@ GRAPHICS-WINDOW
 1
 -100
 100
--5
-5
+-9
+10
 1
 1
 1
@@ -227,10 +234,10 @@ NIL
 0
 
 PLOT
-448
-263
-772
-413
+10
+454
+334
+604
 count turtles
 NIL
 NIL
@@ -252,7 +259,7 @@ CHOOSER
 competition_type
 competition_type
 "strict K" "beverton-holt like"
-0
+1
 
 CHOOSER
 24
@@ -286,7 +293,7 @@ SWITCH
 356
 density_dependent_dispersal
 density_dependent_dispersal
-0
+1
 1
 -1000
 
@@ -299,29 +306,110 @@ K
 K
 10
 500
-150.0
+80.0
 10
 1
 NIL
 HORIZONTAL
 
 PLOT
-449
-426
-772
-576
+398
+164
+672
+415
 expansion
-NIL
-NIL
+time (generations)
+distance from origin (patches)
 0.0
-10.0
+300.0
 0.0
-10.0
-true
+100.0
+false
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "let front_position max [abs xcor] of turtles\nplot front_position"
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nplot mean fronts\n\n;;plot mean fronts"
+"pen-2" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) + 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n\n;;plot mean fronts"
+"pen-3" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) - 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n\n;;plot mean fronts"
+"mean(evo lines)" 1.0 0 -2674135 true "" "let fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nplot mean fronts\n\n"
+"pen-4" 1.0 0 -2674135 true "" "\nlet fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) + 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n;;plot mean fronts\n"
+"pen-5" 1.0 0 -2674135 true "" "let fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) - 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]"
+
+PLOT
+675
+278
+887
+459
+genetic diversity non evo - core
+generations
+Genetic diversity
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"mean (evo lines)" 1.0 0 -2674135 true "" "let coredivs []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet div_core  mean [neutral_allele] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredivs lput (1 - 2 * abs(div_core - 0.5) ) coredivs\nset yline yline + 1\n]\n\nplot mean coredivs\n"
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let coredivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet div_core  mean [neutral_allele] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredivs lput (1 - 2 * abs(div_core - 0.5) ) coredivs\nset yline yline + 1\n]\n\nplot mean coredivs\n"
+
+PLOT
+888
+279
+1099
+459
+genetic diversity no evo -front
+generations
+genetic diversity
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"mean (evo lines)" 1.0 0 -2674135 true "" "let frontdivs []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet div_front  mean [neutral_allele] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdivs lput (1 - 2 * abs(div_front - 0.5) ) frontdivs\nset yline yline + 1\n]\n\nplot mean frontdivs\n\n"
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let frontdivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet div_front  mean [neutral_allele] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdivs lput (1 - 2 * abs(div_front - 0.5) ) frontdivs\nset yline yline + 1\n]\n\nplot mean frontdivs\n\n"
+
+PLOT
+888
+120
+1097
+278
+disp rate non evo front
+generation
+dispersal rate
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"evo" 1.0 0 -2674135 true "" "let frontdisps []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet disp_front  mean [disp-max] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdisps lput disp_front frontdisps\nset yline yline + 1\n]\n\nplot mean frontdisps"
+"non evo" 1.0 0 -16777216 true "" "\nlet frontdisps []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet disp_front  mean [disp-max] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdisps lput disp_front frontdisps\nset yline yline + 1\n]\n\nplot mean frontdisps"
+
+PLOT
+674
+120
+887
+279
+disp rate non evo core
+generation
+dispersal rate
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"default" 1.0 0 -2674135 true "" "let coredisps []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet disp_core  mean [disp-max] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredisps lput disp_core coredisps\nset yline yline + 1\n]\n\nplot mean coredisps"
+"pen-1" 1.0 0 -16777216 true "" "let coredisps []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet disp_core  mean [disp-max] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredisps lput disp_core coredisps\nset yline yline + 1\n]\n\nplot mean coredisps\n"
 
 @#$#@#$#@
 ## WHAT IS IT?
