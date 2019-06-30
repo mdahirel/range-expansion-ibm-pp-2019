@@ -26,7 +26,7 @@ end
 
 to define-landscape
   set-patch-size 5
-  resize-world -100 100 -9 10 ;;generate the correct landscape size
+  resize-world -100 100 -24 25 ;;generate the correct landscape size
   set runtime 300
   ask patches [set pcolor black]
 end
@@ -50,9 +50,9 @@ to setup-turtles
     ;set birth-patch patch-here
     set fecundity 1.1
 
-    set disp-max random-normal 0.1 0.5 ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
+    set disp-max random-normal 0.5 0.25 ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
     ;; if we don't do that and set artificially fixed d for non-evo; we have evo+stocha versus non evo and non stocha, instead of evo/non evo being the only difference
-    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.1 0.5 ]
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.25 ]
     set disp-h 25
     set disp-lambda 4
     set allee-thres start_allee_thres
@@ -154,9 +154,9 @@ if has-mated = 0 [
       set fecundity [fecundity] of mom
 
       ifelse (pycor > 0)
-    [set disp-max random-normal 0.1 0.5];[set disp-max 0.5] ;;if non-evo we redraw from initial distri (think about setting global vars for that)
+    [set disp-max random-normal 0.5 0.25];[set disp-max 0.5] ;;if non-evo we redraw from initial distri (think about setting global vars for that)
     [set disp-max [disp-max] of mom] ;; if evo we inherit
-    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.1 0.5 ]
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.25 ]
       ;;set disp-max [disp-max] of mom
       set disp-h [disp-h] of mom
       set disp-lambda [disp-lambda] of mom
@@ -173,10 +173,10 @@ to check-death
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
+376
 10
-1223
-119
+1389
+319
 -1
 -1
 5.0
@@ -191,8 +191,8 @@ GRAPHICS-WINDOW
 1
 -100
 100
--9
-10
+-29
+30
 1
 1
 1
@@ -306,17 +306,17 @@ K
 K
 10
 500
-80.0
+70.0
 10
 1
 NIL
 HORIZONTAL
 
 PLOT
-398
-164
-672
-415
+406
+332
+680
+583
 expansion
 time (generations)
 distance from origin (patches)
@@ -336,11 +336,11 @@ PENS
 "pen-5" 1.0 0 -2674135 true "" "let fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) - 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]"
 
 PLOT
-675
-278
-887
-459
-genetic diversity non evo - core
+683
+446
+895
+627
+genetic diversity  - core
 generations
 Genetic diversity
 0.0
@@ -355,11 +355,11 @@ PENS
 "mean(no evo lines)" 1.0 0 -16777216 true "" "let coredivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet div_core  mean [neutral_allele] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredivs lput (1 - 2 * abs(div_core - 0.5) ) coredivs\nset yline yline + 1\n]\n\nplot mean coredivs\n"
 
 PLOT
-888
-279
-1099
-459
-genetic diversity no evo -front
+896
+447
+1107
+627
+genetic diversity- front
 generations
 genetic diversity
 0.0
@@ -374,11 +374,11 @@ PENS
 "mean(no evo lines)" 1.0 0 -16777216 true "" "let frontdivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet div_front  mean [neutral_allele] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdivs lput (1 - 2 * abs(div_front - 0.5) ) frontdivs\nset yline yline + 1\n]\n\nplot mean frontdivs\n\n"
 
 PLOT
-888
-120
-1097
-278
-disp rate non evo front
+896
+288
+1105
+446
+dispersal rate - front
 generation
 dispersal rate
 0.0
@@ -393,11 +393,11 @@ PENS
 "non evo" 1.0 0 -16777216 true "" "\nlet frontdisps []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet disp_front  mean [disp-max] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdisps lput disp_front frontdisps\nset yline yline + 1\n]\n\nplot mean frontdisps"
 
 PLOT
-674
-120
-887
-279
-disp rate non evo core
+682
+288
+895
+447
+dispersal rate - core
 generation
 dispersal rate
 0.0
