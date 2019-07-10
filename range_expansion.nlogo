@@ -87,6 +87,7 @@ to go
   ask turtles[check-death]
   tick
   ]
+ stop
 end
 
 to check_population_size
