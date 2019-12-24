@@ -3,151 +3,184 @@
 ;;initial NetLogo version: June 2019
 ;;authors : Maxime Dahirel / Marjorie Haond (initial MatLab model)
 
-;; extensions [ r ] will need to install the connection??
+;; extensions [ r ] will need to install the connection between the two for this to work
 
-turtles-own [disp logit_disp0 disp0 disp_slope neutral_allele neutral_allele_shuffled adult has_reproduced available_moves allee_thres ind_fecundity parentID birth_patch]
-patches-own [carrying_capacity population_size N_predispersal N_postdispersal]
+globals[runtime]
+turtles-own [disp disp-max disp-h disp-lambda fecundity neutral_allele adult has-mated available-moves allee-thres]  ;birth-patch
+patches-own [carrying_capacity population_size food gen-diversity mean-disp-max]
 
 
 to setup
   clear-all
+  ;setup-genetics
   define-landscape
   setup-patches
   setup-turtles
   reset-ticks
 end
 
+;to setup-genetics
+;set initial_frequency_dark_allele 0.5
+;end
 
 
 to define-landscape
-  set-patch-size 2
-  resize-world -300 300 0 0 ;;generate the correct landscape size
+  set-patch-size 5
+  resize-world -100 100 -24 25 ;;generate the correct landscape size
+  set runtime 300
   ask patches [set pcolor black]
 end
 
 to setup-patches
-  ask patches [set carrying_capacity K]  ;; open things to randomized carrying using poisson(K)
-  ask patches with [pxcor = 0] [sprout carrying_capacity]
-  ask patches [check_population_size]
+  ask patches [
+    set carrying_capacity K
+    set pcolor scale-color green carrying_capacity 0 carrying_capacity + 1
+
+    ]
 end
 
 to setup-turtles
-  ask turtles[
-    hide-turtle  ;; we don't visualise individuals on the screen; we show patch level summary via colour
-    set adult 1
-    set has_reproduced 0
-    set neutral_allele random allele_number
-    set neutral_allele_shuffled random allele_number
-    set birth_patch pxcor
+  ask patches with [pxcor = 0] [ sprout K ]
 
-    set logit_disp0 random-normal logit_disp0_mean logit_disp0_sd ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
+  ask turtles[
+    hide-turtle
+    set adult 1
+    set has-mated 0
+    set neutral_allele one-of [0 1] ;;; use breeds later and test % breeds???
+    ;set birth-patch patch-here
+    set fecundity 1.1
+
+    set disp-max random-normal 0.5 0.25 ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
     ;; if we don't do that and set artificially fixed d for non-evo; we have evo+stocha versus non evo and non stocha, instead of evo/non evo being the only difference
-    set disp_slope random-normal slope_disp_mean slope_disp_sd
-    set allee_thres start_allee_thres
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.25 ]
+    set disp-h 25
+    set disp-lambda 4
+    set allee-thres start_allee_thres
   ]
+
+  ask patches [check_population_size]
+
+
 end
 
 
 
 to go
-  if (ticks > duration) [stop]  ; !!!avoid using while loops here to express this cause it separates ticks from step and mess up with nlrx
+  while [ticks < runtime] [
+  ask patches[check_population_size]
+  ask patches[update_allelic_frequency]
+  ask patches[reset-food]
 
-  if (ticks > 0 ) [
-    ;; the cycle starts with reproduction and ends after dispersal, to make saving data easier _ only adults are alive at the end of a cycle
-    ;; but because of that, some steps must be omitted during first round, or else model doesn't work _ like killing all adults before reproduction
+  ;;competition step  (can be interpreted as either parents competing for egg sites, or larvae competiting against each other _ I think)
+  if competition_type = "strict K" [ ask turtles[competition_strict_K] ]
+  if competition_type = "beverton-holt like" [ ask turtles[competition_beverton_holt] ]
 
-    ;; reproduction step
-    ask turtles[reproduce] ;; the reproduction formula includes competition
-    ;; enforce non-overlapping generations: kill all adults and leave only juveniles produced in previous round
-    ask turtles[check_death]
-    ;;only juveniles remain, make them adults
-    ask turtles[set adult 1]
-  ]
-
-  ;;predispersal count here
-  ask patches[check_population_size] ;
-  ask patches[set N_predispersal population_size]
+  ask patches[check_population_size] ;; need a second population size check to update population size for density-dependent dispersal
 
   ;;dispersal step
-  ask turtles[move_turtles]
+  ask turtles[move-turtles]
 
-  ;;postdispersal count here
-  ask patches[check_population_size] ;; need a second population size check to update population size for density-dependent dispersal
-  ask patches[set N_postdispersal population_size]
+  ;; reproduction step
+  ask turtles[reproduce]
 
+  ;; enforce non-overlapping generations: kill all adults
+  ask turtles[check-death]
   tick
+  ]
+ stop
 end
 
 to check_population_size
 set population_size count turtles-here
-set pcolor scale-color green population_size 0 (carrying_capacity * 1.1) ;; recheck how to give color (only Nturtles, no color changes with traits)
+  ifelse population_size > 0
+  [set mean-disp-max mean ([disp-max] of (turtles-on self)) ]
+  [set mean-disp-max -50 ]
+  set pcolor scale-color (80 - 40 * mean-disp-max ) population_size 0 (1.3 * carrying_capacity)
+  ;if ((count (turtles-on self) with [neutral_allele = 0]) > (count (turtles-on self) with [neutral_allele = 1])) [set pcolor pcolor - 40] ;; quick and very dirty to see which of 2 neutral alleles dominate
+end
+
+to update_allelic_frequency
+  ifelse population_size > 5
+  [
+    ifelse (count (turtles-on self) with [neutral_allele = 0]) > (count (turtles-on self) with [neutral_allele = 1])
+
+    [set gen-diversity (count (turtles-on self) with [neutral_allele = 1]) / (count (turtles-on self) with [neutral_allele = 0]) ]
+    [set gen-diversity (count (turtles-on self) with [neutral_allele = 0]) / (count (turtles-on self) with [neutral_allele = 1]) ]
+  ]
+  [set gen-diversity -50 ]
+end
+
+to reset-food
+set food carrying_capacity
+end
+
+to competition_strict_K  ;;to use if it is impossible to a have a population > carrying capacity, even transiently (parasitoids with no hyper-p)
+if food < 1 [ die ]
+ask patch-here [set food (food - 1)]
+set adult 1
+end
+
+to competition_beverton_holt
+  if (random 1000) > (1000 * 1 / (1 + (population_size * (fecundity - 1) / (carrying_capacity * fecundity) ) )) [die]
+  ;;beverton like ; from poethke 2016 ; to check
+set adult 1
+end
+
+to move-turtles
+  set available-moves [1 -1] ;;;to check
+;;; if animal is at landscape border can only disperse in one direction (but keep same total disp proba)
+  if xcor = max-pxcor [set available-moves [-1]]
+  if xcor = min-pxcor [set available-moves [1]]
+
+  ;if density_dependent_dispersal = "Off" [set disp disp-max]
+  ifelse density_dependent_dispersal [set disp (disp-max * (population_size ^ disp-lambda)/(disp-h ^ disp-lambda + population_size ^ disp-lambda) )] ;; hill function of maximal dispersal rate; how to include negative DDD???
+                                      [set disp disp-max]
+  if (random 1000) < (disp * 1000)
+  [set xcor xcor + one-of available-moves]
 end
 
 
-to move_turtles
-  set available_moves [1 -1] ;;;individuals can only move left or right
-;;; if animal is at landscape border can only disperse in one direction (but keep same total disp proba) (only as safety in case landscape size misspecified relative to test duration)
-  if xcor = max-pxcor [set available_moves [-1]]
-  if xcor = min-pxcor [set available_moves [1]]
-
-  set disp 1 / (1 + exp (-(logit_disp0 + disp_slope * population_size))) ;; logit linear function, allow negative DDD; no need for special DDD button, DDD active if slope !=0
-
-  if ( (random-float 1) < disp)  ;;sets whether the individual moves
-  [set xcor xcor + one-of available_moves]
-end
-
-
-to reproduce  ; clonal reproduction at the moment, no mutation
-if has_reproduced = 0 [
+to reproduce  ; clonal reproduction to start, no mutation yet
+if has-mated = 0 [
     let mom self
-    set ind_fecundity exp( fecundity * (1 - population_size / carrying_capacity ) * ( (population_size - allee_thres) / carrying_capacity ) )
-    ;;taken from erm phillips am nat in press Evolution transforms pushed waves into pulled waves is eq P8 using eq P2 in courchamp et al book page 68
-    ;;include allee effects if allee_thres>0, includes neg dens dep at igh density in any case
-
-    hatch random-poisson ind_fecundity [ ;; the clutch laid by the focal animal
+    if ( allee_effects_repro = "yes-marjorie" and population_size <= allee-thres ) [set fecundity (population_size / allee-thres)]
+    if allee_effects_repro = "yes-erm-phillips" [set fecundity (exp( fecundity * (1 - population_size / K ) * ( (population_size - allee-thres) / K ) ))]
+    ;; look also at altwegg 2013 for another allee formulation
+          hatch random-poisson fecundity [;; the clutch laid by the focal animal
       hide-turtle
       set adult 0
-      set has_reproduced 0
-
-      ;;neutral alleles
+      set has-mated 0
       set neutral_allele [neutral_allele] of mom
-      set neutral_allele_shuffled random allele_number ;;this one is not inherited and is redrawn every generation, used as control
+      ;set birth-patch patch-here
+      set fecundity [fecundity] of mom
 
-      set birth_patch pxcor
-      set parentID [who] of mom ;; used to estimate effective population size, we just count the number of unique parent IDs per birth patch at the next generation
-
-      ;;trait determination
-      ifelse (trait_variation = "reshuffled");;if non-evolutionary simulation we redraw traits from initial distribution ;; if evolutionary we inherit
-      [set logit_disp0 random-normal logit_disp0_mean logit_disp0_sd
-       set disp_slope random-normal slope_disp_mean slope_disp_sd
-      ]
-      [set logit_disp0 [logit_disp0] of mom
-       set disp_slope [disp_slope] of mom
-      ]
-      set allee_thres start_allee_thres
-      ;;set fecundity [fecundity] of mom ;; for later evolutionary tests with fecundity heritable
-      ;;set allee_thres [allee_thres] of mom;; same with allee
+      ifelse (pycor > 0)
+    [set disp-max random-normal 0.5 0.25];[set disp-max 0.5] ;;if non-evo we redraw from initial distri (think about setting global vars for that)
+    [set disp-max [disp-max] of mom] ;; if evo we inherit
+    while [disp-max < 0 or disp-max > 1] [ set disp-max random-normal 0.5 0.25 ]
+      ;;set disp-max [disp-max] of mom
+      set disp-h [disp-h] of mom
+      set disp-lambda [disp-lambda] of mom
+      set allee-thres [allee-thres] of mom
       ]
 
-      set has_reproduced 1
+      set has-mated 1
     ]
 end
 
 
-to check_death
+to check-death
     if adult = 1 [ die ]
-  ;;Note: we check death based on the "adult" flag rather than the "has_reproduced" flag to accomodate future extensions of model with sexual reproduction
-  ;;(which implies that not all adults may be able to find a mate)
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-13
-29
-1223
-40
+376
+10
+1389
+319
 -1
 -1
-2.0
+5.0
 1
 10
 1
@@ -157,10 +190,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--300
-300
-0
-0
+-100
+100
+-29
+30
 1
 1
 1
@@ -201,157 +234,12 @@ NIL
 NIL
 0
 
-SLIDER
-697
-249
-869
-282
-start_allee_thres
-start_allee_thres
-0
-250
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-24
-243
-196
-276
-K
-K
-10
-500
-200.0
-10
-1
-NIL
-HORIZONTAL
-
-SLIDER
-25
-293
-197
-326
-allele_number
-allele_number
-2
-20
-10.0
-1
-1
-NIL
-HORIZONTAL
-
-CHOOSER
-28
-176
-166
-221
-trait_variation
-trait_variation
-"reshuffled" "evolutionary"
-0
-
-SLIDER
-263
-178
-435
-211
-logit_disp0_sd
-logit_disp0_sd
-0
-2
-0.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-263
-223
-435
-256
-logit_disp0_mean
-logit_disp0_mean
--4
-4
-0.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-473
-176
-645
-209
-fecundity
-fecundity
-0
-5
-2.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-265
-316
-437
-349
-slope_disp_mean
-slope_disp_mean
--4
-4
-0.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-264
-362
-436
-395
-slope_disp_sd
-slope_disp_sd
-0
-2
-0.0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-26
-398
-198
-431
-duration
-duration
-0
-1000
-200.0
-10
-1
-NIL
-HORIZONTAL
-
 PLOT
-685
-374
-885
-524
-count individuals
+10
+454
+334
+604
+count turtles
 NIL
 NIL
 0.0
@@ -363,6 +251,166 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles"
+
+CHOOSER
+25
+173
+171
+218
+competition_type
+competition_type
+"strict K" "beverton-holt like"
+1
+
+CHOOSER
+24
+251
+172
+296
+allee_effects_repro
+allee_effects_repro
+"no" "yes-marjorie" "yes-erm-phillips"
+0
+
+SLIDER
+199
+250
+371
+283
+start_allee_thres
+start_allee_thres
+0
+10
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+SWITCH
+23
+323
+241
+356
+density_dependent_dispersal
+density_dependent_dispersal
+1
+1
+-1000
+
+SLIDER
+4
+387
+176
+420
+K
+K
+10
+500
+70.0
+10
+1
+NIL
+HORIZONTAL
+
+PLOT
+406
+332
+680
+583
+expansion
+time (generations)
+distance from origin (patches)
+0.0
+300.0
+0.0
+100.0
+false
+false
+"" ""
+PENS
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nplot mean fronts\n\n;;plot mean fronts"
+"pen-2" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) + 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n\n;;plot mean fronts"
+"pen-3" 1.0 0 -16777216 true "" "let fronts []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) - 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n\n;;plot mean fronts"
+"mean(evo lines)" 1.0 0 -2674135 true "" "let fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nplot mean fronts\n\n"
+"pen-4" 1.0 0 -2674135 true "" "\nlet fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) + 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]\n;;plot mean fronts\n"
+"pen-5" 1.0 0 -2674135 true "" "let fronts []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\nset fronts lput front_position1 fronts\nset fronts lput abs(front_position2) fronts\nset yline yline + 1\n]\n\nifelse mean fronts > 0 \n[plot (mean fronts) - 1.96 * (standard-deviation fronts / sqrt (mean fronts))]\n[plot 0]"
+
+PLOT
+683
+446
+895
+627
+genetic diversity  - core
+generations
+Genetic diversity
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"mean (evo lines)" 1.0 0 -2674135 true "" "let coredivs []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet div_core  mean [neutral_allele] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredivs lput (1 - 2 * abs(div_core - 0.5) ) coredivs\nset yline yline + 1\n]\n\nplot mean coredivs\n"
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let coredivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet div_core  mean [neutral_allele] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredivs lput (1 - 2 * abs(div_core - 0.5) ) coredivs\nset yline yline + 1\n]\n\nplot mean coredivs\n"
+
+PLOT
+896
+447
+1107
+627
+genetic diversity- front
+generations
+genetic diversity
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"mean (evo lines)" 1.0 0 -2674135 true "" "let frontdivs []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet div_front  mean [neutral_allele] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdivs lput (1 - 2 * abs(div_front - 0.5) ) frontdivs\nset yline yline + 1\n]\n\nplot mean frontdivs\n\n"
+"mean(no evo lines)" 1.0 0 -16777216 true "" "let frontdivs []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet div_front  mean [neutral_allele] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdivs lput (1 - 2 * abs(div_front - 0.5) ) frontdivs\nset yline yline + 1\n]\n\nplot mean frontdivs\n\n"
+
+PLOT
+896
+288
+1105
+446
+dispersal rate - front
+generation
+dispersal rate
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"evo" 1.0 0 -2674135 true "" "let frontdisps []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet disp_front  mean [disp-max] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdisps lput disp_front frontdisps\nset yline yline + 1\n]\n\nplot mean frontdisps"
+"non evo" 1.0 0 -16777216 true "" "\nlet frontdisps []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet front_position1 max [xcor] of turtles with [ycor = yline]\nlet front_position2 min [xcor] of turtles with [ycor = yline]\n\n\nlet disp_front  mean [disp-max] of turtles with [ycor = yline and ( xcor >= ( front_position1 - 2) or xcor <= (front_position2 + 2 ) ) ]\n\nset frontdisps lput disp_front frontdisps\nset yline yline + 1\n]\n\nplot mean frontdisps"
+
+PLOT
+682
+288
+895
+447
+dispersal rate - core
+generation
+dispersal rate
+0.0
+300.0
+0.0
+1.0
+false
+false
+"" ""
+PENS
+"default" 1.0 0 -2674135 true "" "let coredisps []\n\nlet yline min-pycor\n\nrepeat round (world-height / 2) [\n\nlet disp_core  mean [disp-max] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredisps lput disp_core coredisps\nset yline yline + 1\n]\n\nplot mean coredisps"
+"pen-1" 1.0 0 -16777216 true "" "let coredisps []\n\nlet yline 1\n\nrepeat round (world-height / 2) [\n\nlet disp_core  mean [disp-max] of turtles with [ycor = yline and xcor >= -2 and xcor <= 2]\n\nset coredisps lput disp_core coredisps\nset yline yline + 1\n]\n\nplot mean coredisps\n"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -712,7 +760,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.1.0
+NetLogo 6.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

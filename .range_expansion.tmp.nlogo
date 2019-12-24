@@ -209,7 +209,7 @@ SLIDER
 start_allee_thres
 start_allee_thres
 0
-250
+10
 10.0
 1
 1
@@ -265,7 +265,7 @@ logit_disp0_sd
 logit_disp0_sd
 0
 2
-0.0
+0.3
 0.1
 1
 NIL
@@ -280,7 +280,7 @@ logit_disp0_mean
 logit_disp0_mean
 -4
 4
-0.0
+-1.8
 0.1
 1
 NIL
@@ -294,7 +294,7 @@ SLIDER
 fecundity
 fecundity
 0
-5
+2
 2.0
 0.1
 1
@@ -341,7 +341,7 @@ duration
 0
 1000
 200.0
-10
+1
 1
 NIL
 HORIZONTAL
