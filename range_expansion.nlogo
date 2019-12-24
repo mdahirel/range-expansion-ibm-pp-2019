@@ -38,7 +38,7 @@ to setup-turtles
     set has_reproduced 0
     set neutral_allele random allele_number
     set neutral_allele_shuffled random allele_number
-    set birth_patch pxcor
+    set birth_patch xcor
 
     set logit_disp0 random-normal logit_disp0_mean logit_disp0_sd ;; same initial distribution for evo and non-evo ; difference is at next generations;; evo inherit from mom;; non-evo redraw from starting distri
     ;; if we don't do that and set artificially fixed d for non-evo; we have evo+stocha versus non evo and non stocha, instead of evo/non evo being the only difference
