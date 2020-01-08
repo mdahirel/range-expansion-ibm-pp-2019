@@ -98,7 +98,7 @@ nl_object@experiment <- experiment(
   idgo="go",
   stopcond="not any? turtles",
   runtime=duration,
-  evalticks= seq(2,duration,2), ##we record every 2 generations to facilitate model fitting
+  evalticks= 1:duration,
   metrics=c("ticks"),
   metrics.patches = c("pxcor","N_predispersal","N_postdispersal","N_allele0","N_allele1"),
   constants=list(
@@ -231,7 +231,14 @@ tabspeed=output_patches %>% filter(N_postdispersal>0) %>%
   group_by(treatment,replicateID,ticks) %>% 
   select(replicateID,pxcor,ticks,treatment,K,velocity_fisher) %>% 
   filter(pxcor==max(pxcor)) %>% 
-  mutate(speed=abs(pxcor)/ticks)
+  group_by(replicateID) %>% 
+  arrange(ticks) %>% 
+  mutate(front=pxcor) %>% 
+  mutate(front_prev=lag(front)) %>% 
+  mutate(front_prev=replace_na(front_prev,0)) %>% 
+  mutate(speed=abs(front)/ticks) %>% 
+  mutate(stalled=front_prev>=front) %>% 
+  ungroup()
 
 ggplot(tabspeed)+
   geom_line(aes(x=ticks,y=speed,group=replicateID))+

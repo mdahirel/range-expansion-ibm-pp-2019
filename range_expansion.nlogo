@@ -274,7 +274,7 @@ SLIDER
 K
 K
 10
-500
+1000
 500.0
 10
 1
@@ -398,6 +398,23 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles"
+
+PLOT
+1059
+137
+1259
+287
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
 
 @#$#@#$#@
 # Range expansion model
