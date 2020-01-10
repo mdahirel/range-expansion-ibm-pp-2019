@@ -415,6 +415,7 @@ true
 false
 "" ""
 PENS
+"pen-0" 1.0 0 -7500403 true "" "let front max( [ pxcor ] of patches with [N_postdispersal > 0] )\nplot mean (  [ 2 * (N_allele0 / N_postdispersal) * (N_allele1 / N_postdispersal)] of patches with [ pxcor = front ] )"
 
 @#$#@#$#@
 # Range expansion model
