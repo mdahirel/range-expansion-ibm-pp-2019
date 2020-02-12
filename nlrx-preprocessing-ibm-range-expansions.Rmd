@@ -36,18 +36,21 @@ We then design the experiments. There are several ways to do it, see nlrx help a
 trt_grid=tibble(treatment=c("control","weak Allee effect (a = 0.95)","strong Allee effect (a = 20)",
                             "density-dependent dispersal",
                             "reduced connectedness"),
-                start_allee_thres=c(0,0.95,20,0,0), #setting this to 1 =~ a doubling of dispersal from n=0 to K, seems realistic
+                start_allee_thres=c(0,0.95,20,0,0),
+                slope_disp_mean=c(0,0,0,1,0), ##leads to roughly doubling of disp between 0 and K, realistic
                 disp0_mean=c(0.2,0.2,0.2,0.2,0.1)
 ) %>% 
-  mutate(fecundity=5, K=450) %>% 
+  mutate(fecundity=5) %>% 
+  expand_grid(K=c(225,450)) %>% 
   mutate(velocity_fisher=2*sqrt(
     log(fecundity)*(1 - 1 / K) * (1 - start_allee_thres / 1)*  ##fecundity term at N = 1 individual
                                   0.5*invlogit(logit(disp0_mean)+(1/K)*slope_disp_mean)) ##dispersal term
     )
 
-nreplicates=50
 
-duration=100
+nreplicates=1
+
+duration=10
 ```
 We also set the number of replicates and the duration of each run here, just so we have every variable we may want to change in the same place.
 

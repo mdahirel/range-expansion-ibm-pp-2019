@@ -14,15 +14,17 @@ nl_object <- nl(nlversion = "6.1.0", nlpath = "C:/Program Files/NetLogo 6.1.0",
                jvmmem = 1024)
 
 ###designing the experiment
-trt_grid=tibble(treatment=c("control","weak Allee effect (a = 0.95)","strong Allee effect (a = 20)",
+trt_grid=tibble(treatment=c("control","weak Allee effect (a = 0.95)",
                             "density-dependent dispersal",
                             "reduced connectedness"),
-                start_allee_thres=c(0,0.95,20,0,0),
-                slope_disp_mean=c(0,0,0,1,0), ##leads to roughly doubling of disp between 0 and K, realistic
-                disp0_mean=c(0.2,0.2,0.2,0.2,0.1)
+                start_allee_thres=c(0,0.95,0,0),
+                slope_disp_mean=c(0,0,1,0), ##leads to roughly doubling of disp between 0 and K, realistic
+                disp0_mean=c(0.2,0.2,0.2,0.1)
 ) %>% 
-  mutate(fecundity=5) %>% 
+  mutate(fecundity = 5) %>% 
   expand_grid(K=c(225,450)) %>% 
+  ###fecundity = 5 ; 
+  ## close to Trichogramma conditions given their sex ratio of about 50% and assuming 24 or 48 h of egg laying, as in experiments see papers
   mutate(velocity_fisher=2*sqrt(
     log(fecundity)*(1 - 1 / K) * (1 - start_allee_thres / 1)*  ##fecundity term at N = 1 individual
                                   0.5*invlogit(logit(disp0_mean)+(1/K)*slope_disp_mean)) ##dispersal term
@@ -35,13 +37,13 @@ trt_grid=tibble(treatment=c("control","weak Allee effect (a = 0.95)","strong All
 ### stop studying multiple K. Do only K =450 as in experiment
 
 ##strong allee effect always pushed even if velocity fisher not defined see birzu 2018 PNAS
-nreplicates=2
+nreplicates=100
 
 duration=100
 ###############################
 
 nl_object@experiment <- experiment(
-  expname="test",
+  expname="experiment-art1-2020",
   outpath="D:/Maxime/Documents/POSTDOC INRA SOPHIA/IBM/range-expansion-ibm-pp-2019/output",
   repetition = 1,
   tickmetrics = "true",
@@ -80,7 +82,7 @@ nl_object@experiment <- experiment(
 set.seed(42) ##we set seed here to guarantee the seeds selected below are the same everytime
 nl_object@simdesign<-simdesign_distinct(nl=nl_object,nseeds=nreplicates)
 
-test=run_nl_all(nl_object)
+exp1_2020=run_nl_all(nl_object)
 
-setsim(nl_object, "simoutput")<-test
+setsim(nl_object, "simoutput")<-exp1_2020
 
